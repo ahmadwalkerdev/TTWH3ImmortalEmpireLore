@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Total War: Warhammer III - Settlement Lore Encyclopedia</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        wh: {
+                            gold: '#d4af37',
+                            goldHover: '#f3ca3e',
+                            dark: '#0f1115',
+                            cardBg: '#181b20',
+                            cardLight: '#22262e',
+                            red: '#8b0000',
+                            burgundy: '#4a0e17',
+                            parchment: '#1c1917',
+                            parchmentText: '#e7d8b8',
+                            border: '#3d3423'
+                        }
+                    },
+                    fontFamily: {
+                        serif: ['Cinzel', 'Georgia', 'serif'],
+                        sans: ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts: Cinzel & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* Custom scrollbar styling for grimdark codex feel */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f1115;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3d3423;
+            border-radius: 4px;
+            border: 1px solid #d4af37;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #d4af37;
+        }
+        .parchment-border {
+            border: 2px solid #3d3423;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.8), 0 0 10px rgba(212,175,55,0.15);
+        }
+        .codex-header {
+            text-shadow: 0 2px 4px rgba(0,0,0,0.9), 0 0 10px rgba(212,175,55,0.3);
+        }
+    </style>
+</head>
+<body class="bg-wh-dark text-gray-200 font-sans min-h-screen flex flex-col selection:bg-wh-gold selection:text-black">
+
+    <header class="bg-wh-cardBg border-b border-wh-border sticky top-0 z-30 shadow-2xl">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+            <!-- Title / Logo -->
+            <div class="flex items-center space-x-3">
+                <i class="fa-solid fa-shield-halved text-wh-gold text-2xl md:text-3xl"></i>
+                <div>
+                    <h1 class="font-serif text-lg md:text-xl font-bold text-wh-gold tracking-wider codex-header">
+                        WARHAMMER III: IMMORTAL EMPIRES
+                    </h1>
+                    <p class="text-xs text-gray-400">Settlement Lore & History Codex</p>
+                </div>
+            </div>
+
+            <!-- Global Action Controls -->
+            <div class="flex items-center flex-wrap gap-2 text-sm">
+                <!-- Mode Toggle -->
+                <button id="toggleEditModeBtn" onclick="toggleEditMode()" class="px-3 py-1.5 rounded bg-wh-cardLight border border-wh-gold/40 text-wh-gold hover:bg-wh-gold hover:text-black transition flex items-center gap-2">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                    <span id="editModeStatusText">Edit Mode: OFF</span>
+                </button>
+
+                <!-- Add Region/Province Button -->
+                <button id="addProvinceBtn" onclick="openProvinceModal()" class="hidden px-3 py-1.5 rounded bg-amber-900/60 border border-amber-600/60 text-amber-200 hover:bg-amber-700 hover:text-white transition items-center gap-1.5">
+                    <i class="fa-solid fa-plus text-xs"></i>
+                    <span>Tambah Provinsi</span>
+                </button>
+
+                <!-- Export Data -->
+                <button onclick="exportDataJSON()" class="px-3 py-1.5 rounded bg-wh-cardLight border border-gray-600 hover:border-wh-gold text-gray-300 hover:text-wh-gold transition flex items-center gap-1.5" title="Ekspor Data JSON">
+                    <i class="fa-solid fa-download"></i>
+                    <span class="hidden sm:inline">Ekspor</span>
+                </button>
+
+                <!-- Import Data -->
+                <label class="px-3 py-1.5 rounded bg-wh-cardLight border border-gray-600 hover:border-wh-gold text-gray-300 hover:text-wh-gold transition cursor-pointer flex items-center gap-1.5" title="Impor Data JSON">
+                    <i class="fa-solid fa-upload"></i>
+                    <span class="hidden sm:inline">Impor</span>
+                    <input type="file" id="importFileInput" accept=".json" class="hidden" onchange="importDataJSON(event)">
+                </label>
+
+                <!-- Reset Data -->
+                <button onclick="confirmResetData()" class="px-3 py-1.5 rounded bg-red-950/50 border border-red-800/60 text-red-300 hover:bg-red-900 transition flex items-center gap-1.5" title="Reset ke Template Default">
+                    <i class="fa-solid fa-rotate-left"></i>
+                    <span class="hidden md:inline">Reset</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex-1 flex flex-col md:flex-row max-w-7xl w-full mx-auto p-4 gap-6">
+
+        <!-- Sidebar Navigation -->
+        <aside class="w-full md:w-80 flex-shrink-0 flex flex-col bg-wh-cardBg rounded-lg border border-wh-border p-4 shadow-lg h-[calc(100vh-100px)] sticky top-20">
+            <!-- Search Bar -->
+            <div class="relative mb-4">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-gray-500 text-sm"></i>
+                <input type="text" id="searchInput" oninput="handleSearch()" placeholder="Cari Provinsi / Settlement..." 
+                    class="w-full pl-9 pr-3 py-2 bg-wh-dark border border-wh-border rounded text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-wh-gold">
+            </div>
+
+            <!-- Region Filter Dropdown -->
+            <div class="mb-3">
+                <select id="regionFilter" onchange="handleFilterRegion()" class="w-full py-1.5 px-2 bg-wh-dark border border-wh-border rounded text-xs text-amber-200/80 focus:outline-none focus:border-wh-gold">
+                    <option value="ALL">Semua Kawasan / Faksi Domain</option>
+                    <!-- Options populated dynamically -->
+                </select>
+            </div>
+
+            <div class="flex justify-between items-center text-xs font-serif text-wh-gold tracking-widest uppercase mb-2 pb-1 border-b border-wh-border/50">
+                <span>Daftar Provinsi</span>
+                <span id="settlementCountBadge" class="text-gray-400 normal-case font-sans">0 Settlement</span>
+            </div>
+
+            <!-- Tree View Navigation Container -->
+            <div id="sidebarTree" class="flex-1 overflow-y-auto space-y-2 pr-1">
+                <!-- Tree items dynamically rendered -->
+            </div>
+        </aside>
+
+        <!-- Main Display Content Area -->
+        <main class="flex-1 bg-wh-cardBg rounded-lg parchment-border p-6 shadow-2xl flex flex-col min-h-[500px]">
+            <div id="codexContent">
+                <!-- Dynamic Content Rendered Here -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Province Modal -->
+    <div id="provinceModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-wh-cardBg border-2 border-wh-gold/60 rounded-lg max-w-md w-full p-6 shadow-2xl relative">
+            <h3 id="provinceModalTitle" class="font-serif text-xl font-bold text-wh-gold mb-4 border-b border-wh-border pb-2">
+                Tambah Provinsi Baru
+            </h3>
+            <form id="provinceForm" onsubmit="saveProvince(event)" class="space-y-4">
+                <input type="hidden" id="provinceIdInput">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Nama Provinsi</label>
+                    <input type="text" id="provinceNameInput" required placeholder="misal: Reikland, Kislev" 
+                        class="w-full bg-wh-dark border border-wh-border rounded p-2 text-sm text-gray-200 focus:outline-none focus:border-wh-gold">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Kawasan / Faksi Utama</label>
+                    <input type="text" id="provinceRegionInput" required placeholder="misal: Empire of Man, Kislev, Grand Cathay" 
+                        class="w-full bg-wh-dark border border-wh-border rounded p-2 text-sm text-gray-200 focus:outline-none focus:border-wh-gold">
+                </div>
+                <div class="flex justify-end gap-3 pt-4 border-t border-wh-border">
+                    <button type="button" onclick="closeProvinceModal()" class="px-4 py-2 text-sm text-gray-400 hover:text-white">Batal</button>
+                    <button type="submit" class="px-4 py-2 text-sm bg-wh-gold text-black font-semibold rounded hover:bg-wh-goldHover">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Settlement Modal -->
+    <div id="settlementModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-wh-cardBg border-2 border-wh-gold/60 rounded-lg max-w-2xl w-full p-6 shadow-2xl relative my-8">
+            <h3 id="settlementModalTitle" class="font-serif text-xl font-bold text-wh-gold mb-4 border-b border-wh-border pb-2">
+                Tambah / Edit Settlement
+            </h3>
+            <form id="settlementForm" onsubmit="saveSettlement(event)" class="space-y-4">
+                <input type="hidden" id="settlementIdInput">
+                <input type="hidden" id="settlementProvinceIdInput">
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Nama Settlement *</label>
+                        <input type="text" id="settlementNameInput" required placeholder="misal: Altdorf" 
+                            class="w-full bg-wh-dark border border-wh-border rounded p-2 text-sm text-gray-200 focus:outline-none focus:border-wh-gold">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Tipe Settlement *</label>
+                        <select id="settlementTypeInput" required class="w-full bg-wh-dark border border-wh-border rounded p-2 text-sm text-gray-200 focus:outline-none focus:border-wh-gold">
+                            <option value="Provincial Capital">Provincial Capital (Ibu Kota)</option>
+                            <option value="Major Settlement">Major Settlement</option>
+                            <option value="Minor Settlement">Minor Settlement</option>
+                            <option value="Special Landmark">Special Landmark / Holy Site</option>
+                            <option value="Fortress / Gate">Fortress / Gate Pass</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Iklim (Climate) *</label>
+                        <select id="settlementClimateInput" required class="w-full bg-wh-dark border border-wh-border rounded p-2 text-sm text-gray-200 focus:outline-none focus:border-wh-gold">
+                            <option value="Temperate">Temperate (Sedang)</option>
+                            <option value="Frozen">Frozen (Salju/Es)</option>
+                            <option value="Mountain">Mountain (Pegunungan)</option>
+                            <option value="Magical Forest">Magical Forest</option>
+                            <option value="Desert">Desert (Gurun)</option>
+                            <option value="Wasteland">Wasteland</option>
+                            <option value="Jungle">Jungle (Hutan Hujan)</option>
+                            <option value="Ocean/Island">Island / Coastal</option>
+                            <option value="Chaos Wastes">Chaos Wastes</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Faksi Pemilik Default *</label>
+                        <input type="text" id="settlementFactionInput" required placeholder="misal: Reikland (Karl Franz)" 
+                            class="w-full bg-wh-dark border border-wh-border rounded p-2 text-sm text-gray-200 focus:outline-none focus:border-wh-gold">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Catatan Landmark / Garrison Unique</label>
+                    <input type="text" id="settlementLandmarkInput" placeholder="misal: Imperial Zoo, Colleges of Magic" 
+                        class="w-full bg-wh-dark border border-wh-border rounded p-2 text-sm text-gray-200 focus:outline-none focus:border-wh-gold">
+                </div>
+
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Deskripsi Lore Lengkap *</label>
+                    <textarea id="settlementLoreInput" rows="6" required placeholder="Tuliskan sejarah, latar belakang, serta signifikansi politik/militer dari settlement ini..." 
+                        class="w-full bg-wh-dark border border-wh-border rounded p-2 text-sm text-gray-200 focus:outline-none focus:border-wh-gold leading-relaxed"></textarea>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4 border-t border-wh-border">
+                    <button type="button" onclick="closeSettlementModal()" class="px-4 py-2 text-sm text-gray-400 hover:text-white">Batal</button>
+                    <button type="submit" class="px-4 py-2 text-sm bg-wh-gold text-black font-semibold rounded hover:bg-wh-goldHover">Simpan Settlement</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Preset sample data Warhammer 3 Immortal Empires
+        const defaultDatabase = [
+            {
+                id: 'prov-reikland',
+                name: 'Reikland',
+                region: 'Empire of Man',
+                settlements: [
+                    {
+                        id: 'settle-altdorf',
+                        name: 'Altdorf',
+                        type: 'Provincial Capital',
+                        climate: 'Temperate',
+                        originalFaction: 'Reikland (Karl Franz)',
+                        landmarks: 'Imperial Zoo, Colleges of Magic, Great Temple of Sigmar',
+                        lore: 'Altdorf adalah ibu kota megah Empire of Man dan tahta resmi Emperor Karl Franz. Terletak di pertemuan Sungai Reik dan Talabec, kota besar ini dikenal dengan arsitektur gothic monumental, menara-menara sihir dari Eight Colleges of Magic, serta Katedral Utama Sigmar. Sebagai benteng budaya dan ilmu pengetahuan peradaban manusia, Altdorf telah bertahan dari pengepungan pasukan Chaos, Vampire Counts, dan Green-skins selama berabad-abad.'
+                    },
+                    {
+                        id: 'settle-ufstadt',
+                        name: 'Ufstadt',
+                        type: 'Minor Settlement',
+                        climate: 'Temperate',
+                        originalFaction: 'Reikland',
+                        landmarks: 'Reik River Docks',
+                        lore: 'Ufstadt merupakan kota pelabuhan sungai kecil di sepanjang bantaran Sungai Reik. Meskipun ukurannya minor, pemukiman ini bertindak sebagai urat nadi perdagangan kayu dan pasokan gandum penting menuju Altdorf serta pos pertahanan vanguard melawan perompak dan monster yang menyusuri aliran sungai.'
+                    }
+                ]
+            },
+            {
+                id: 'prov-kislev',
+                name: 'Oblast of Kislev',
+                region: 'Kislev',
+                settlements: [
+                    {
+                        id: 'settle-kislev',
+                        name: 'Kislev (The Royal City)',
+                        type: 'Provincial Capital',
+                        climate: 'Frozen',
+                        originalFaction: 'The Ice Court (Tsarina Katarin)',
+                        landmarks: 'Bokha Palace, Great Orthodoxy Temple',
+                        lore: 'Ibu kota legendaris Kerajaan Kislev. Terkenal akan menara kubah emasnya yang berkilauan di tengah badai salju abadi. Dikelilingi tembok kokoh yang ditempa oleh pengalaman bertempur berdarah melintasi generasi, kota Kislev berdiri teguh sebagai perisai pertama kawasan selatan dari invasi mematikan pasukan Chaos dari Wastes.'
+                    },
+                    {
+                        id: 'settle-praag',
+                        name: 'Praag',
+                        type: 'Major Settlement',
+                        climate: 'Frozen',
+                        originalFaction: 'The Ice Court',
+                        landmarks: 'Cursed Walls of Praag',
+                        lore: 'Dikenal sebagai "City of Curses", Praag telah berkali-kali dihancurkan dan ternoda oleh energi Daemonik selama Great War against Chaos. Batu-batu bangunannya pernah meliuk dan menyatu dengan daging para warganya. Meski telah dibangun kembali, bisikan gaib dan atmosfer kelam masih menyelimuti jalanan batu kota pertahanan utara ini.'
+                    }
+                ]
+            },
+            {
+                id: 'prov-karaz-a-karak',
+                name: 'Silver Road',
+                region: 'Dwarfs (Karaz Ankor)',
+                settlements: [
+                    {
+                        id: 'settle-karaz-akarak',
+                        name: 'Karaz-a-Karak',
+                        type: 'Provincial Capital',
+                        climate: 'Mountain',
+                        originalFaction: 'Karaz-a-Karak (High King Thorgrim Grudgebearer)',
+                        landmarks: 'Great Throne Room of the High King, Hall of Ancestors',
+                        lore: 'Kota utama dari seluruh Karaz Ankor (Kerajaan Kurcaci). Dikenal juga sebagai The Everpeak, benteng gunung raksasa ini tidak pernah jatuh ke tangan musuh sepanjang sejarahnya. Karaz-a-Karak adalah tempat dimana Great Book of Grudges disimpan, dipenuhi oleh ukiran rune kuno dan kekayaan emas melimpah yang tak ternilai.'
+                    }
+                ]
+            },
+            {
+                id: 'prov-northern-wei-jin',
+                name: 'Celestial River',
+                region: 'Grand Cathay',
+                settlements: [
+                    {
+                        id: 'settle-weijin',
+                        name: 'Wei-Jin',
+                        type: 'Provincial Capital',
+                        climate: 'Temperate',
+                        originalFaction: 'Northern Provinces (Miao Ying)',
+                        landmarks: 'Celestial Dragon Palace, Great Citadel',
+                        lore: 'Wei-Jin adalah takhta kekaisaran Grand Cathay tempat Celestial Dragon Emperor dan Moon Empress bertakhta. Kota ini menampilkan kemegahan arsitektur timur dengan benteng berukir naga emas, taman-taman melayang, dan menara sihir yang mampu mengendalikan badai yin dan yang.'
+                    }
+                ]
+            }
+        ];
+
+        // App State
+        let database = [];
+        let isEditMode = false;
+        let selectedSettlementId = null;
+        let selectedProvinceId = null;
+        let currentSearchQuery = '';
+        let currentRegionFilter = 'ALL';
+
+        // LocalStorage Key
+        const STORAGE_KEY = 'wh3_settlement_lore_db_v1';
+
+        // Initialize App
+        window.addEventListener('DOMContentLoaded', () => {
+            loadDatabase();
+            renderSidebar();
+            selectDefaultItem();
+        });
+
+        // Load DB from LocalStorage or Fallback
+        function loadDatabase() {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                try {
+                    database = JSON.parse(stored);
+                } catch (e) {
+                    console.error('Failed to parse local database:', e);
+                    database = JSON.parse(JSON.stringify(defaultDatabase));
+                }
+            } else {
+                database = JSON.parse(JSON.stringify(defaultDatabase));
+            }
+            saveDatabaseToStorage();
+        }
+
+        function saveDatabaseToStorage() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(database));
+        }
+
+        // Toggle Edit Mode
+        function toggleEditMode() {
+            isEditMode = !isEditMode;
+            const statusText = document.getElementById('editModeStatusText');
+            const addProvBtn = document.getElementById('addProvinceBtn');
+
+            if (isEditMode) {
+                statusText.textContent = 'Edit Mode: ON';
+                statusText.classList.add('text-green-400');
+                addProvBtn.classList.remove('hidden');
+                addProvBtn.classList.add('flex');
+            } else {
+                statusText.textContent = 'Edit Mode: OFF';
+                statusText.classList.remove('text-green-400');
+                addProvBtn.classList.add('hidden');
+                addProvBtn.classList.remove('flex');
+            }
+
+            renderSidebar();
+            renderCodex();
+        }
+
+        // Select Default view on load
+        function selectDefaultItem() {
+            if (database.length > 0 && database[0].settlements.length > 0) {
+                selectSettlement(database[0].settlements[0].id, database[0].id);
+            } else if (database.length > 0) {
+                selectProvince(database[0].id);
+            } else {
+                renderCodex();
+            }
+        }
+
+        // Populate Region Filter Select
+        function populateRegionFilter() {
+            const filterSelect = document.getElementById('regionFilter');
+            const regions = new Set();
+            database.forEach(p => {
+                if (p.region) regions.add(p.region);
+            });
+
+            let html = `<option value="ALL">Semua Kawasan / Faksi Domain</option>`;
+            regions.forEach(reg => {
+                const selected = currentRegionFilter === reg ? 'selected' : '';
+                html += `<option value="${escapeHTML(reg)}" ${selected}>${escapeHTML(reg)}</option>`;
+            });
+            filterSelect.innerHTML = html;
+        }
+
+        // Render Sidebar Navigation
+        function renderSidebar() {
+            populateRegionFilter();
+            const sidebarContainer = document.getElementById('sidebarTree');
+            let totalSettlements = 0;
+            let html = '';
+
+            const query = currentSearchQuery.toLowerCase().trim();
+
+            database.forEach(prov => {
+                // Filter by region dropdown
+                if (currentRegionFilter !== 'ALL' && prov.region !== currentRegionFilter) {
+                    return;
+                }
+
+                // Filter settlements by search
+                const matchingSettlements = prov.settlements.filter(s => 
+                    s.name.toLowerCase().includes(query) || 
+                    s.lore.toLowerCase().includes(query) ||
+                    s.originalFaction.toLowerCase().includes(query)
+                );
+
+                const provinceMatches = prov.name.toLowerCase().includes(query) || prov.region.toLowerCase().includes(query);
+
+                if (query && !provinceMatches && matchingSettlements.length === 0) {
+                    return; // Skip if search doesn't match
+                }
+
+                totalSettlements += prov.settlements.length;
+                const isProvSelected = selectedProvinceId === prov.id && !selectedSettlementId;
+
+                html += `
+                <div class="bg-wh-dark/70 border border-wh-border/70 rounded overflow-hidden">
+                    <div class="flex items-center justify-between p-2 hover:bg-wh-cardLight transition cursor-pointer ${isProvSelected ? 'border-l-4 border-wh-gold bg-wh-cardLight' : ''}">
+                        <div class="flex items-center gap-2 overflow-hidden" onclick="selectProvince('${prov.id}')">
+                            <i class="fa-solid fa-map-location-dot text-wh-gold text-xs"></i>
+                            <div>
+                                <h4 class="font-serif font-bold text-xs text-amber-100 truncate">${escapeHTML(prov.name)}</h4>
+                                <span class="text-[10px] text-gray-400 block">${escapeHTML(prov.region)}</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            ${isEditMode ? `
+                                <button onclick="openProvinceModal('${prov.id}')" title="Edit Provinsi" class="text-xs text-gray-400 hover:text-wh-gold p-1">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                                <button onclick="deleteProvince('${prov.id}')" title="Hapus Provinsi" class="text-xs text-gray-400 hover:text-red-400 p-1">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                                <button onclick="openSettlementModal(null, '${prov.id}')" title="Tambah Settlement" class="text-xs text-amber-400 hover:text-wh-gold p-1">
+                                    <i class="fa-solid fa-plus-circle"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <!-- Settlements Under Province -->
+                    <div class="pl-4 pr-1 py-1 space-y-1 bg-black/30 border-t border-wh-border/30">
+                `;
+
+                const settlementsToDisplay = query ? (provinceMatches ? prov.settlements : matchingSettlements) : prov.settlements;
+
+                if (settlementsToDisplay.length === 0) {
+                    html += `<p class="text-[11px] text-gray-500 italic py-1 pl-2">Tidak ada settlement.</p>`;
+                } else {
+                    settlementsToDisplay.forEach(settle => {
+                        const isSettleSelected = selectedSettlementId === settle.id;
+                        html += `
+                        <div class="flex items-center justify-between py-1 px-2 rounded hover:bg-wh-dark/80 cursor-pointer text-xs ${isSettleSelected ? 'bg-wh-gold/20 text-wh-gold font-semibold border-l-2 border-wh-gold' : 'text-gray-300'}"
+                             onclick="selectSettlement('${settle.id}', '${prov.id}')">
+                            <div class="flex items-center gap-2 truncate">
+                                <i class="fa-solid ${getSettlementIcon(settle.type)} text-[10px] text-wh-gold/70"></i>
+                                <span class="truncate">${escapeHTML(settle.name)}</span>
+                            </div>
+                            ${isEditMode ? `
+                                <div class="flex items-center gap-1">
+                                    <button onclick="event.stopPropagation(); openSettlementModal('${settle.id}', '${prov.id}')" class="text-[10px] text-gray-400 hover:text-wh-gold p-0.5">
+                                        <i class="fa-solid fa-pen"></i>
+                                    </button>
+                                    <button onclick="event.stopPropagation(); deleteSettlement('${settle.id}', '${prov.id}')" class="text-[10px] text-gray-400 hover:text-red-400 p-0.5">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </div>
+                            ` : ''}
+                        </div>
+                        `;
+                    });
+                }
+
+                html += `
+                    </div>
+                </div>
+                `;
+            });
+
+            if (html === '') {
+                html = `<p class="text-xs text-gray-400 text-center py-6">Tidak ada provinsi atau settlement ditemukan.</p>`;
+            }
+
+            sidebarContainer.innerHTML = html;
+            document.getElementById('settlementCountBadge').textContent = `${totalSettlements} Settlement`;
+        }
+
+        // Selection Handlers
+        function selectProvince(provId) {
+            selectedProvinceId = provId;
+            selectedSettlementId = null;
+            renderSidebar();
+            renderCodex();
+        }
+
+        function selectSettlement(settleId, provId) {
+            selectedSettlementId = settleId;
+            selectedProvinceId = provId;
+            renderSidebar();
+            renderCodex();
+        }
+
+        // Filter & Search Handlers
+        function handleSearch() {
+            currentSearchQuery = document.getElementById('searchInput').value;
+            renderSidebar();
+        }
+
+        function handleFilterRegion() {
+            currentRegionFilter = document.getElementById('regionFilter').value;
+            renderSidebar();
+        }
+
+        // Icon Helper for Settlement Types
+        function getSettlementIcon(type) {
+            switch(type) {
+                case 'Provincial Capital': return 'fa-crown';
+                case 'Major Settlement': return 'fa-castle';
+                case 'Minor Settlement': return 'fa-house-chimney-window';
+                case 'Special Landmark': return 'fa-monument';
+                case 'Fortress / Gate': return 'fa-shield-cat';
+                default: return 'fa-location-dot';
+            }
+        }
+
+        // Render Main Codex / Detail View
+        function renderCodex() {
+            const container = document.getElementById('codexContent');
+
+            if (!selectedProvinceId && !selectedSettlementId) {
+                container.innerHTML = `
+                <div class="h-full flex flex-col items-center justify-center text-center p-8 text-gray-400 my-auto">
+                    <i class="fa-solid fa-book-skull text-6xl text-wh-gold/40 mb-4"></i>
+                    <h2 class="font-serif text-2xl text-wh-gold mb-2">Ensiklopedia Lore Warhammer III</h2>
+                    <p class="max-w-md text-sm text-gray-400">Silakan pilih provinsi atau settlement dari daftar navigasi di sebelah kiri untuk membaca arsip lore dan sejarah wilayah Immortal Empires.</p>
+                </div>
+                `;
+                return;
+            }
+
+            const currentProv = database.find(p => p.id === selectedProvinceId);
+
+            if (selectedSettlementId) {
+                // Render Settlement View
+                let currentSettle = null;
+                if (currentProv) {
+                    currentSettle = currentProv.settlements.find(s => s.id === selectedSettlementId);
+                }
+
+                if (!currentSettle) {
+                    container.innerHTML = `<p class="text-red-400">Data settlement tidak ditemukan.</p>`;
+                    return;
+                }
+
+                container.innerHTML = `
+                <article class="space-y-6">
+                    <!-- Header Badges & Title -->
+                    <div class="border-b border-wh-border pb-4">
+                        <div class="flex flex-wrap items-center gap-2 mb-2">
+                            <span class="px-2.5 py-0.5 rounded text-xs font-semibold bg-wh-gold/10 border border-wh-gold/40 text-wh-gold">
+                                <i class="fa-solid ${getSettlementIcon(currentSettle.type)} mr-1"></i> ${escapeHTML(currentSettle.type)}
+                            </span>
+                            <span class="px-2.5 py-0.5 rounded text-xs bg-wh-dark border border-wh-border text-amber-200">
+                                <i class="fa-solid fa-cloud-sun mr-1"></i> ${escapeHTML(currentSettle.climate)}
+                            </span>
+                            <span class="px-2.5 py-0.5 rounded text-xs bg-wh-dark border border-wh-border text-gray-300">
+                                <i class="fa-solid fa-map-pin mr-1"></i> Provinsi: ${escapeHTML(currentProv ? currentProv.name : 'N/A')}
+                            </span>
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <h2 class="font-serif text-3xl md:text-4xl font-extrabold text-wh-gold codex-header">
+                                ${escapeHTML(currentSettle.name)}
+                            </h2>
+                            ${isEditMode ? `
+                                <div class="flex gap-2">
+                                    <button onclick="openSettlementModal('${currentSettle.id}', '${currentProv.id}')" class="px-3 py-1 bg-amber-900/40 border border-amber-600 text-amber-200 text-xs rounded hover:bg-amber-700 hover:text-white transition">
+                                        <i class="fa-solid fa-pen mr-1"></i> Edit
+                                    </button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <!-- Meta Information Box -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-wh-dark/60 p-4 rounded border border-wh-border/80 text-sm">
+                        <div>
+                            <span class="text-xs text-gray-400 uppercase tracking-wider block font-serif">Faksi Pemilik Default:</span>
+                            <span class="font-medium text-amber-100">${escapeHTML(currentSettle.originalFaction || 'Tidak diketahui')}</span>
+                        </div>
+                        <div>
+                            <span class="text-xs text-gray-400 uppercase tracking-wider block font-serif">Landmark / Fitur Khusus:</span>
+                            <span class="font-medium text-amber-100">${escapeHTML(currentSettle.landmarks || 'None')}</span>
+                        </div>
+                    </div>
+
+                    <!-- Lore Description Content -->
+                    <div class="space-y-4">
+                        <h3 class="font-serif text-lg font-bold text-wh-gold border-b border-wh-border/50 pb-1 flex items-center gap-2">
+                            <i class="fa-solid fa-scroll text-sm"></i> Catatan Sejarah & Lore
+                        </h3>
+                        <div class="text-wh-parchmentText text-sm leading-relaxed whitespace-pre-line font-sans tracking-wide">
+                            ${escapeHTML(currentSettle.lore)}
+                        </div>
+                    </div>
+                </article>
+                `;
+            } else if (currentProv) {
+                // Render Province Overview View
+                container.innerHTML = `
+                <article class="space-y-6">
+                    <div class="border-b border-wh-border pb-4">
+                        <span class="px-2.5 py-0.5 rounded text-xs font-semibold bg-wh-gold/10 border border-wh-gold/40 text-wh-gold">
+                            <i class="fa-solid fa-earth-americas mr-1"></i> Kawasan: ${escapeHTML(currentProv.region)}
+                        </span>
+                        <div class="flex items-center justify-between mt-2">
+                            <h2 class="font-serif text-3xl font-extrabold text-wh-gold codex-header">
+                                Provinsi ${escapeHTML(currentProv.name)}
+                            </h2>
+                            ${isEditMode ? `
+                                <button onclick="openProvinceModal('${currentProv.id}')" class="px-3 py-1 bg-amber-900/40 border border-amber-600 text-amber-200 text-xs rounded hover:bg-amber-700 transition">
+                                    <i class="fa-solid fa-pen mr-1"></i> Edit Provinsi
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <p class="text-sm text-gray-300">
+                        Provinsi <strong>${escapeHTML(currentProv.name)}</strong> berada di bawah domain <strong>${escapeHTML(currentProv.region)}</strong>. Berikut adalah daftar settlement penting yang terletak di dalam batas wilayah ini:
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                        ${currentProv.settlements.map(s => `
+                            <div onclick="selectSettlement('${s.id}', '${currentProv.id}')" class="bg-wh-dark/80 border border-wh-border rounded p-4 hover:border-wh-gold transition cursor-pointer group">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h4 class="font-serif text-base font-bold text-amber-200 group-hover:text-wh-gold flex items-center gap-2">
+                                        <i class="fa-solid ${getSettlementIcon(s.type)} text-sm text-wh-gold"></i>
+                                        ${escapeHTML(s.name)}
+                                    </h4>
+                                    <span class="text-[10px] bg-wh-cardBg border border-wh-border px-2 py-0.5 rounded text-gray-400">${escapeHTML(s.type)}</span>
+                                </div>
+                                <p class="text-xs text-gray-400 line-clamp-3 mb-2">${escapeHTML(s.lore)}</p>
+                                <span class="text-[11px] text-wh-gold group-hover:underline inline-flex items-center gap-1">
+                                    Baca Lore Selengkapnya <i class="fa-solid fa-arrow-right text-[9px]"></i>
+                                </span>
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    ${isEditMode ? `
+                        <div class="pt-4 border-t border-wh-border">
+                            <button onclick="openSettlementModal(null, '${currentProv.id}')" class="px-4 py-2 bg-wh-gold/20 border border-wh-gold text-wh-gold rounded text-sm hover:bg-wh-gold hover:text-black font-semibold transition flex items-center gap-2">
+                                <i class="fa-solid fa-plus-circle"></i> Tambah Settlement Baru ke Provinsi Ini
+                            </button>
+                        </div>
+                    ` : ''}
+                </article>
+                `;
+            }
+        }
+
+        // Helper function to escape HTML string
+        function escapeHTML(str) {
+            if (!str) return '';
+            return str.replace(/[&<>'"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            );
+        }
+
+        // Province CRUD
+        function openProvinceModal(provId = null) {
+            const modal = document.getElementById('provinceModal');
+            const title = document.getElementById('provinceModalTitle');
+            const idInput = document.getElementById('provinceIdInput');
+            const nameInput = document.getElementById('provinceNameInput');
+            const regionInput = document.getElementById('provinceRegionInput');
+
+            if (provId) {
+                const prov = database.find(p => p.id === provId);
+                if (prov) {
+                    title.textContent = 'Edit Provinsi';
+                    idInput.value = prov.id;
+                    nameInput.value = prov.name;
+                    regionInput.value = prov.region;
+                }
+            } else {
+                title.textContent = 'Tambah Provinsi Baru';
+                idInput.value = '';
+                nameInput.value = '';
+                regionInput.value = '';
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeProvinceModal() {
+            document.getElementById('provinceModal').classList.add('hidden');
+        }
+
+        function saveProvince(e) {
+            e.preventDefault();
+            const id = document.getElementById('provinceIdInput').value;
+            const name = document.getElementById('provinceNameInput').value.trim();
+            const region = document.getElementById('provinceRegionInput').value.trim();
+
+            if (id) {
+                const prov = database.find(p => p.id === id);
+                if (prov) {
+                    prov.name = name;
+                    prov.region = region;
+                }
+            } else {
+                const newProv = {
+                    id: 'prov-' + Date.now(),
+                    name: name,
+                    region: region,
+                    settlements: []
+                };
+                database.push(newProv);
+                selectedProvinceId = newProv.id;
+                selectedSettlementId = null;
+            }
+
+            saveDatabaseToStorage();
+            closeProvinceModal();
+            renderSidebar();
+            renderCodex();
+        }
+
+        function deleteProvince(provId) {
+            if (confirm('Apakah Anda yakin ingin menghapus provinsi ini beserta seluruh settlement di dalamnya?')) {
+                database = database.filter(p => p.id !== provId);
+                if (selectedProvinceId === provId) {
+                    selectedProvinceId = null;
+                    selectedSettlementId = null;
+                }
+                saveDatabaseToStorage();
+                renderSidebar();
+                renderCodex();
+            }
+        }
+
+        // Settlement CRUD
+        function openSettlementModal(settleId = null, provId = null) {
+            const modal = document.getElementById('settlementModal');
+            const title = document.getElementById('settlementModalTitle');
+            const idInput = document.getElementById('settlementIdInput');
+            const provIdInput = document.getElementById('settlementProvinceIdInput');
+            
+            const nameInput = document.getElementById('settlementNameInput');
+            const typeInput = document.getElementById('settlementTypeInput');
+            const climateInput = document.getElementById('settlementClimateInput');
+            const factionInput = document.getElementById('settlementFactionInput');
+            const landmarkInput = document.getElementById('settlementLandmarkInput');
+            const loreInput = document.getElementById('settlementLoreInput');
+
+            provIdInput.value = provId || selectedProvinceId;
+
+            if (settleId) {
+                title.textContent = 'Edit Settlement';
+                const prov = database.find(p => p.id === provIdInput.value);
+                const settle = prov ? prov.settlements.find(s => s.id === settleId) : null;
+
+                if (settle) {
+                    idInput.value = settle.id;
+                    nameInput.value = settle.name;
+                    typeInput.value = settle.type;
+                    climateInput.value = settle.climate;
+                    factionInput.value = settle.originalFaction || '';
+                    landmarkInput.value = settle.landmarks || '';
+                    loreInput.value = settle.lore || '';
+                }
+            } else {
+                title.textContent = 'Tambah Settlement Baru';
+                idInput.value = '';
+                nameInput.value = '';
+                typeInput.value = 'Provincial Capital';
+                climateInput.value = 'Temperate';
+                factionInput.value = '';
+                landmarkInput.value = '';
+                loreInput.value = '';
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeSettlementModal() {
+            document.getElementById('settlementModal').classList.add('hidden');
+        }
+
+        function saveSettlement(e) {
+            e.preventDefault();
+            const settleId = document.getElementById('settlementIdInput').value;
+            const provId = document.getElementById('settlementProvinceIdInput').value;
+
+            const name = document.getElementById('settlementNameInput').value.trim();
+            const type = document.getElementById('settlementTypeInput').value;
+            const climate = document.getElementById('settlementClimateInput').value;
+            const originalFaction = document.getElementById('settlementFactionInput').value.trim();
+            const landmarks = document.getElementById('settlementLandmarkInput').value.trim();
+            const lore = document.getElementById('settlementLoreInput').value.trim();
+
+            const prov = database.find(p => p.id === provId);
+            if (!prov) return;
+
+            if (settleId) {
+                const settle = prov.settlements.find(s => s.id === settleId);
+                if (settle) {
+                    settle.name = name;
+                    settle.type = type;
+                    settle.climate = climate;
+                    settle.originalFaction = originalFaction;
+                    settle.landmarks = landmarks;
+                    settle.lore = lore;
+                }
+            } else {
+                const newSettle = {
+                    id: 'settle-' + Date.now(),
+                    name: name,
+                    type: type,
+                    climate: climate,
+                    originalFaction: originalFaction,
+                    landmarks: landmarks,
+                    lore: lore
+                };
+                prov.settlements.push(newSettle);
+                selectedSettlementId = newSettle.id;
+            }
+
+            selectedProvinceId = provId;
+            saveDatabaseToStorage();
+            closeSettlementModal();
+            renderSidebar();
+            renderCodex();
+        }
+
+        function deleteSettlement(settleId, provId) {
+            if (confirm('Apakah Anda yakin ingin menghapus settlement ini?')) {
+                const prov = database.find(p => p.id === provId);
+                if (prov) {
+                    prov.settlements = prov.settlements.filter(s => s.id !== settleId);
+                    if (selectedSettlementId === settleId) {
+                        selectedSettlementId = null;
+                    }
+                    saveDatabaseToStorage();
+                    renderSidebar();
+                    renderCodex();
+                }
+            }
+        }
+
+        // Export JSON Data
+        function exportDataJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(database, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `warhammer3_settlements_lore_${new Date().toISOString().slice(0,10)}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        // Import JSON Data
+        function importDataJSON(event) {
+            const fileReader = new FileReader();
+            fileReader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    if (Array.isArray(importedData)) {
+                        database = importedData;
+                        saveDatabaseToStorage();
+                        selectDefaultItem();
+                        renderSidebar();
+                        renderCodex();
+                        alert('Database lore berhasil diimpor!');
+                    } else {
+                        alert('Format JSON tidak valid. Harus berupa array data provinsi.');
+                    }
+                } catch (err) {
+                    alert('Gagal membaca file JSON: ' + err.message);
+                }
+            };
+            if (event.target.files[0]) {
+                fileReader.readAsText(event.target.files[0]);
+            }
+        }
+
+        // Reset to Default Sample Template
+        function confirmResetData() {
+            if (confirm('Apakah Anda yakin ingin mengembalikan seluruh data ke preset data contoh awal? Semua perubahan tersimpan lokal akan ditimpa.')) {
+                database = JSON.parse(JSON.stringify(defaultDatabase));
+                saveDatabaseToStorage();
+                selectDefaultItem();
+                renderSidebar();
+                renderCodex();
+            }
+        }
+    </script>
+</body>
+</html>
