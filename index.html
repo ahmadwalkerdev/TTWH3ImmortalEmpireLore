@@ -40,7 +40,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
-        /* Custom scrollbar styling for grimdark codex feel */
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -137,7 +136,6 @@
             <div class="mb-3">
                 <select id="regionFilter" onchange="handleFilterRegion()" class="w-full py-1.5 px-2 bg-wh-dark border border-wh-border rounded text-xs text-amber-200/80 focus:outline-none focus:border-wh-gold">
                     <option value="ALL">Semua Kawasan / Faksi Domain</option>
-                    <!-- Options populated dynamically -->
                 </select>
             </div>
 
@@ -148,19 +146,17 @@
 
             <!-- Tree View Navigation Container -->
             <div id="sidebarTree" class="flex-1 overflow-y-auto space-y-2 pr-1">
-                <!-- Tree items dynamically rendered -->
             </div>
         </aside>
 
         <!-- Main Display Content Area -->
         <main class="flex-1 bg-wh-cardBg rounded-lg parchment-border p-6 shadow-2xl flex flex-col min-h-[500px]">
-        <div id="codexContent">
-            <!-- Dynamic Content Rendered Here -->
-        </div>
-    </main>
-</div>
+            <div id="codexContent">
+            </div>
+        </main>
+    </div>
 
-    <!-- Custom Notification & Confirmation Modal (Replaces browser alert/confirm) -->
+    <!-- Custom Dialog Modal -->
     <div id="customDialogModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-wh-cardBg border-2 border-wh-gold/80 rounded-lg max-w-md w-full p-6 shadow-2xl relative text-center">
             <i id="dialogIcon" class="fa-solid fa-circle-info text-4xl text-wh-gold mb-3 block"></i>
@@ -270,37 +266,33 @@
         </div>
     </div>
 
-    <!-- Firebase Cloud Sync Integration -->
+    <!-- Firebase Cloud Sync & Offline LocalStorage Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Kredensial Firebase Mandiri untuk Hosting Publik (Ganti dengan config Firebase Anda jika di-host mandiri)
-const firebaseConfig = {
-  apiKey: "AIzaSyAovOp9wBnJsYwDmsEw2SZ0wnmhPX0S0BI",
-  authDomain: "warhammer3-lore-codex.firebaseapp.com",
-  projectId: "warhammer3-lore-codex",
-  storageBucket: "warhammer3-lore-codex.firebasestorage.app",
-  messagingSenderId: "1078440177047",
-  appId: "1:1078440177047:web:9265b00b7e0ef06bd2a8d2",
-  measurementId: "G-83MQN9YVFN"
-};
+        // Kredensial Firebase Mandiri
+        const myStandaloneFirebaseConfig = {
+            apiKey: "YOUR_API_KEY_HERE",
+            authDomain: "your-app.firebaseapp.com",
+            projectId: "your-app-id",
+            storageBucket: "your-app.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:123456"
+        };
 
-        // Deteksi Otomatis Environment Platform vs Standalone Hosting
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'warhammer3-codex-app';
         const firebaseConfig = typeof __firebase_config !== 'undefined' 
             ? JSON.parse(__firebase_config) 
             : myStandaloneFirebaseConfig;
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        let db = null;
+        let auth = null;
+        window.isCloudConnected = false;
 
-        // Path Rule 1: /artifacts/{appId}/public/data/provinces
-        const provincesCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'provinces');
+        const LOCAL_STORAGE_KEY = 'wh3_codex_local_data';
 
-        // Preset sample data
         const defaultDatabase = [
             {
                 id: 'prov-reikland',
@@ -314,73 +306,7 @@ const firebaseConfig = {
                         climate: 'Temperate',
                         originalFaction: 'Reikland (Karl Franz)',
                         landmarks: 'Imperial Zoo, Colleges of Magic, Great Temple of Sigmar',
-                        lore: 'Altdorf adalah ibu kota megah Empire of Man dan tahta resmi Emperor Karl Franz. Terletak di pertemuan Sungai Reik dan Talabec, kota besar ini dikenal dengan arsitektur gothic monumental, menara-menara sihir dari Eight Colleges of Magic, serta Katedral Utama Sigmar. Sebagai benteng budaya dan ilmu pengetahuan peradaban manusia, Altdorf telah bertahan dari pengepungan pasukan Chaos, Vampire Counts, dan Green-skins selama berabad-abad.'
-                    },
-                    {
-                        id: 'settle-ufstadt',
-                        name: 'Ufstadt',
-                        type: 'Minor Settlement',
-                        climate: 'Temperate',
-                        originalFaction: 'Reikland',
-                        landmarks: 'Reik River Docks',
-                        lore: 'Ufstadt merupakan kota pelabuhan sungai kecil di sepanjang bantaran Sungai Reik. Meskipun ukurannya minor, pemukiman ini bertindak sebagai urat nadi perdagangan kayu dan pasokan gandum penting menuju Altdorf serta pos pertahanan vanguard melawan perompak dan monster yang menyusuri aliran sungai.'
-                    }
-                ]
-            },
-            {
-                id: 'prov-kislev',
-                name: 'Oblast of Kislev',
-                region: 'Kislev',
-                settlements: [
-                    {
-                        id: 'settle-kislev',
-                        name: 'Kislev (The Royal City)',
-                        type: 'Provincial Capital',
-                        climate: 'Frozen',
-                        originalFaction: 'The Ice Court (Tsarina Katarin)',
-                        landmarks: 'Bokha Palace, Great Orthodoxy Temple',
-                        lore: 'Ibu kota legendaris Kerajaan Kislev. Terkenal akan menara kubah emasnya yang berkilauan di tengah badai salju abadi. Dikelilingi tembok kokoh yang ditempa oleh pengalaman bertempur berdarah melintasi generasi, kota Kislev berdiri teguh sebagai perisai pertama kawasan selatan dari invasi mematikan pasukan Chaos dari Wastes.'
-                    },
-                    {
-                        id: 'settle-praag',
-                        name: 'Praag',
-                        type: 'Major Settlement',
-                        climate: 'Frozen',
-                        originalFaction: 'The Ice Court',
-                        landmarks: 'Cursed Walls of Praag',
-                        lore: 'Dikenal sebagai "City of Curses", Praag telah berkali-kali dihancurkan dan ternoda oleh energi Daemonik selama Great War against Chaos. Batu-batu bangunannya pernah meliuk dan menyatu dengan daging para warganya. Meski telah dibangun kembali, bisikan gaib dan atmosfer kelam masih menyelimuti jalanan batu kota pertahanan utara ini.'
-                    }
-                ]
-            },
-            {
-                id: 'prov-karaz-a-karak',
-                name: 'Silver Road',
-                region: 'Dwarfs (Karaz Ankor)',
-                settlements: [
-                    {
-                        id: 'settle-karaz-akarak',
-                        name: 'Karaz-a-Karak',
-                        type: 'Provincial Capital',
-                        climate: 'Mountain',
-                        originalFaction: 'Karaz-a-Karak (High King Thorgrim Grudgebearer)',
-                        landmarks: 'Great Throne Room of the High King, Hall of Ancestors',
-                        lore: 'Kota utama dari seluruh Karaz Ankor (Kerajaan Kurcaci). Dikenal juga sebagai The Everpeak, benteng gunung raksasa ini tidak pernah jatuh ke tangan musuh sepanjang sejarahnya. Karaz-a-Karak adalah tempat dimana Great Book of Grudges disimpan, dipenuhi oleh ukiran rune kuno dan kekayaan emas melimpah yang tak ternilai.'
-                    }
-                ]
-            },
-            {
-                id: 'prov-northern-wei-jin',
-                name: 'Celestial River',
-                region: 'Grand Cathay',
-                settlements: [
-                    {
-                        id: 'settle-weijin',
-                        name: 'Wei-Jin',
-                        type: 'Provincial Capital',
-                        climate: 'Temperate',
-                        originalFaction: 'Northern Provinces (Miao Ying)',
-                        landmarks: 'Celestial Dragon Palace, Great Citadel',
-                        lore: 'Wei-Jin adalah takhta kekaisaran Grand Cathay tempat Celestial Dragon Emperor dan Moon Empress bertakhta. Kota ini menampilkan kemegahan arsitektur timur dengan benteng berukir naga emas, taman-taman melayang, dan menara sihir yang mampu mengendalikan badai yin dan yang.'
+                        lore: 'Altdorf adalah ibu kota megah Empire of Man dan tahta resmi Emperor Karl Franz...'
                     }
                 ]
             }
@@ -425,7 +351,27 @@ const firebaseConfig = {
             }
         };
 
-        // Update Cloud Status UI Indicator
+        // Local Storage Helper
+        window.saveToLocalStorage = function() {
+            try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(window.database));
+            } catch (e) {
+                console.warn("Gagal menyimpan ke LocalStorage:", e);
+            }
+        };
+
+        window.loadFromLocalStorage = function() {
+            try {
+                const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+                if (stored) {
+                    return JSON.parse(stored);
+                }
+            } catch (e) {
+                console.warn("Gagal membaca LocalStorage:", e);
+            }
+            return null;
+        };
+
         function updateCloudStatus(status, text) {
             const badge = document.getElementById('cloudStatusBadge');
             const textElem = document.getElementById('cloudStatusText');
@@ -433,92 +379,112 @@ const firebaseConfig = {
 
             textElem.textContent = text;
             if (status === 'connected') {
+                window.isCloudConnected = true;
                 badge.className = "px-3 py-1.5 rounded bg-green-950/60 border border-green-500/50 text-green-300 flex items-center gap-2 text-xs";
                 badge.querySelector('i').className = "fa-solid fa-cloud-check";
             } else if (status === 'syncing') {
                 badge.className = "px-3 py-1.5 rounded bg-wh-cardLight border border-wh-gold/50 text-wh-gold flex items-center gap-2 text-xs";
                 badge.querySelector('i').className = "fa-solid fa-cloud-arrow-up animate-pulse";
             } else {
-                badge.className = "px-3 py-1.5 rounded bg-red-950/60 border border-red-500/50 text-red-300 flex items-center gap-2 text-xs";
-                badge.querySelector('i').className = "fa-solid fa-cloud-xmark";
+                window.isCloudConnected = false;
+                badge.className = "px-3 py-1.5 rounded bg-amber-950/60 border border-amber-500/50 text-amber-300 flex items-center gap-2 text-xs";
+                badge.querySelector('i').className = "fa-solid fa-hard-drive";
             }
         }
 
-        // Initialize Firebase Authentication & Real-time Listeners
-        async function initCloudSync() {
-            try {
-                updateCloudStatus('syncing', 'Otentikasi Cloud...');
-                
-                // Rule 3: Auth BEFORE Queries
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
+        async function initApp() {
+            // Check LocalStorage first for instant offline startup
+            const localData = window.loadFromLocalStorage();
+            if (localData && Array.isArray(localData) && localData.length > 0) {
+                window.database = localData;
+                window.selectDefaultItem();
+                window.renderSidebar();
+                window.renderCodex();
+            }
 
-                updateCloudStatus('syncing', 'Menyinkronkan Data...');
+            // Try Firebase connection if config is valid
+            if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY_HERE") {
+                try {
+                    updateCloudStatus('syncing', 'Menghubungkan Cloud...');
+                    const app = initializeApp(firebaseConfig);
+                    auth = getAuth(app);
+                    db = getFirestore(app);
 
-                // Real-time listener using onSnapshot
-                onSnapshot(provincesCollectionRef, async (snapshot) => {
-                    const loadedProvinces = [];
-                    snapshot.forEach(docSnap => {
-                        loadedProvinces.push({ id: docSnap.id, ...docSnap.data() });
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+
+                    const provincesCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'provinces');
+
+                    onSnapshot(provincesCollectionRef, async (snapshot) => {
+                        const loadedProvinces = [];
+                        snapshot.forEach(docSnap => {
+                            loadedProvinces.push({ id: docSnap.id, ...docSnap.data() });
+                        });
+
+                        if (loadedProvinces.length > 0) {
+                            window.database = loadedProvinces;
+                            window.saveToLocalStorage();
+                        } else if (window.database.length === 0) {
+                            // Seed default data if database is empty
+                            window.database = defaultDatabase;
+                            window.saveToLocalStorage();
+                            for (const prov of defaultDatabase) {
+                                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'provinces', prov.id), prov);
+                            }
+                        }
+
+                        updateCloudStatus('connected', 'Cloud Terhubung');
+                        if (!window.selectedProvinceId && !window.selectedSettlementId) {
+                            window.selectDefaultItem();
+                        }
+                        window.renderSidebar();
+                        window.renderCodex();
+                    }, (error) => {
+                        console.warn("Firestore error:", error);
+                        updateCloudStatus('offline', 'Mode Penyimpanan Lokal');
                     });
 
-                    // If cloud DB is brand new/empty, seed with default database
-                    if (loadedProvinces.length === 0 && snapshot.metadata.fromCache === false) {
-                        updateCloudStatus('syncing', 'Inisialisasi Template Data...');
-                        for (const prov of defaultDatabase) {
-                            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'provinces', prov.id), prov);
-                        }
-                        return;
-                    }
-
-                    window.database = loadedProvinces;
-                    updateCloudStatus('connected', 'Cloud Terhubung');
-
-                    if (!window.selectedProvinceId && !window.selectedSettlementId) {
-                        window.selectDefaultItem();
-                    }
-
+                } catch (err) {
+                    console.warn("Firebase Init Exception:", err);
+                    updateCloudStatus('offline', 'Mode Penyimpanan Lokal');
+                }
+            } else {
+                updateCloudStatus('offline', 'Mode Penyimpanan Lokal');
+                if (window.database.length === 0) {
+                    window.database = defaultDatabase;
+                    window.selectDefaultItem();
                     window.renderSidebar();
                     window.renderCodex();
-                }, (error) => {
-                    console.error("Firestore error:", error);
-                    updateCloudStatus('error', 'Gagal Sinkron Cloud');
-                });
-
-            } catch (err) {
-                console.error("Cloud Initialization Error:", err);
-                updateCloudStatus('error', 'Koneksi Cloud Terputus');
+                }
             }
         }
 
-        // Helper to sync single province to Firestore
         window.saveProvinceToCloud = async function(provinceData) {
-            updateCloudStatus('syncing', 'Menyimpan...');
-            try {
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'provinces', provinceData.id), provinceData);
-                updateCloudStatus('connected', 'Cloud Terhubung');
-            } catch (e) {
-                console.error("Failed to save province:", e);
-                updateCloudStatus('error', 'Gagal Menyimpan');
+            window.saveToLocalStorage();
+            if (window.isCloudConnected && db) {
+                try {
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'provinces', provinceData.id), provinceData);
+                } catch (e) {
+                    console.error("Gagal simpan ke Cloud:", e);
+                }
             }
         };
 
-        // Helper to delete province from Firestore
         window.deleteProvinceFromCloud = async function(provId) {
-            updateCloudStatus('syncing', 'Menghapus...');
-            try {
-                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'provinces', provId));
-                updateCloudStatus('connected', 'Cloud Terhubung');
-            } catch (e) {
-                console.error("Failed to delete province:", e);
-                updateCloudStatus('error', 'Gagal Menghapus');
+            window.database = window.database.filter(p => p.id !== provId);
+            window.saveToLocalStorage();
+            if (window.isCloudConnected && db) {
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'provinces', provId));
+                } catch (e) {
+                    console.error("Gagal hapus dari Cloud:", e);
+                }
             }
         };
 
-        // Application Methods
         window.toggleEditMode = function() {
             window.isEditMode = !window.isEditMode;
             const statusText = document.getElementById('editModeStatusText');
@@ -541,7 +507,7 @@ const firebaseConfig = {
         };
 
         window.selectDefaultItem = function() {
-            if (window.database.length > 0 && window.database[0].settlements.length > 0) {
+            if (window.database.length > 0 && window.database[0].settlements && window.database[0].settlements.length > 0) {
                 window.selectSettlement(window.database[0].settlements[0].id, window.database[0].id);
             } else if (window.database.length > 0) {
                 window.selectProvince(window.database[0].id);
@@ -582,7 +548,7 @@ const firebaseConfig = {
 
                 const matchingSettlements = (prov.settlements || []).filter(s => 
                     s.name.toLowerCase().includes(query) || 
-                    s.lore.toLowerCase().includes(query) ||
+                    (s.lore && s.lore.toLowerCase().includes(query)) ||
                     (s.originalFaction && s.originalFaction.toLowerCase().includes(query))
                 );
 
@@ -888,6 +854,7 @@ const firebaseConfig = {
                     region: region,
                     settlements: []
                 };
+                window.database.push(targetProv);
                 window.selectedProvinceId = targetProv.id;
                 window.selectedSettlementId = null;
             }
@@ -896,13 +863,15 @@ const firebaseConfig = {
                 await window.saveProvinceToCloud(targetProv);
             }
 
+            window.renderSidebar();
+            window.renderCodex();
             window.closeProvinceModal();
         };
 
         window.deleteProvince = async function(provId) {
             const confirmed = await window.showCustomDialog(
                 'Hapus Provinsi',
-                'Apakah Anda yakin ingin menghapus provinsi ini beserta seluruh settlement di dalamnya dari Cloud?',
+                'Apakah Anda yakin ingin menghapus provinsi ini beserta seluruh settlement di dalamnya?',
                 true,
                 'fa-triangle-exclamation text-red-500'
             );
@@ -913,6 +882,8 @@ const firebaseConfig = {
                     window.selectedProvinceId = null;
                     window.selectedSettlementId = null;
                 }
+                window.renderSidebar();
+                window.renderCodex();
             }
         };
 
@@ -1006,13 +977,15 @@ const firebaseConfig = {
 
             window.selectedProvinceId = provId;
             await window.saveProvinceToCloud(prov);
+            window.renderSidebar();
+            window.renderCodex();
             window.closeSettlementModal();
         };
 
         window.deleteSettlement = async function(settleId, provId) {
             const confirmed = await window.showCustomDialog(
                 'Hapus Settlement',
-                'Apakah Anda yakin ingin menghapus settlement ini dari Cloud?',
+                'Apakah Anda yakin ingin menghapus settlement ini?',
                 true,
                 'fa-trash text-red-400'
             );
@@ -1025,6 +998,8 @@ const firebaseConfig = {
                         window.selectedSettlementId = null;
                     }
                     await window.saveProvinceToCloud(prov);
+                    window.renderSidebar();
+                    window.renderCodex();
                 }
             }
         };
@@ -1039,51 +1014,90 @@ const firebaseConfig = {
             downloadAnchor.remove();
         };
 
+        // Improved Import Mechanism with Offline LocalStorage & Immediate Render
         window.importDataJSON = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
             const fileReader = new FileReader();
             fileReader.onload = async function(e) {
                 try {
                     const importedData = JSON.parse(e.target.result);
-                    if (Array.isArray(importedData)) {
+                    if (Array.isArray(importedData) && importedData.length > 0) {
+                        // 1. Set local database state
+                        window.database = importedData;
+                        
+                        // 2. Save directly to LocalStorage
+                        window.saveToLocalStorage();
+
+                        // 3. Attempt cloud synchronization if connected
                         for (const prov of importedData) {
                             if (prov.id) {
                                 await window.saveProvinceToCloud(prov);
                             }
                         }
-                        await window.showCustomDialog('Sukses', 'Database lore berhasil diimpor dan disinkronkan ke Cloud!', false, 'fa-circle-check text-green-400');
+
+                        // 4. Select first item and immediately re-render view
+                        if (window.database.length > 0) {
+                            window.selectedProvinceId = window.database[0].id;
+                            window.selectedSettlementId = (window.database[0].settlements && window.database[0].settlements.length > 0) 
+                                ? window.database[0].settlements[0].id 
+                                : null;
+                        }
+
+                        window.renderSidebar();
+                        window.renderCodex();
+
+                        const statusInfo = window.isCloudConnected 
+                            ? 'Data juga telah tersinkronisasi ke Cloud Firebase.' 
+                            : 'Data tersimpan dalam memori lokal peramban (Mode Offline).';
+
+                        await window.showCustomDialog(
+                            'Sukses Impor', 
+                            `Berhasil mengimpor ${importedData.length} provinsi dan settlement-nya!\n${statusInfo}`, 
+                            false, 
+                            'fa-circle-check text-green-400'
+                        );
                     } else {
-                        await window.showCustomDialog('Gagal Impor', 'Format JSON tidak valid. Harus berupa array data provinsi.', false, 'fa-circle-xmark text-red-400');
+                        await window.showCustomDialog('Gagal Impor', 'Format JSON tidak valid. File harus berupa array data provinsi.', false, 'fa-circle-xmark text-red-400');
                     }
                 } catch (err) {
                     await window.showCustomDialog('Gagal Impor', 'Gagal membaca file JSON: ' + err.message, false, 'fa-circle-xmark text-red-400');
+                } finally {
+                    event.target.value = '';
                 }
             };
-            if (event.target.files[0]) {
-                fileReader.readAsText(event.target.files[0]);
-            }
+            fileReader.readAsText(file);
         };
 
         window.confirmResetData = async function() {
             const confirmed = await window.showCustomDialog(
-                'Reset Database Cloud',
-                'Apakah Anda yakin ingin mengembalikan seluruh data cloud ke preset data contoh awal?',
+                'Reset Database',
+                'Apakah Anda yakin ingin mengembalikan seluruh data ke preset template awal?',
                 true,
                 'fa-rotate-left text-amber-500'
             );
 
             if (confirmed) {
-                for (const prov of window.database) {
-                    await window.deleteProvinceFromCloud(prov.id);
+                if (window.isCloudConnected) {
+                    for (const prov of window.database) {
+                        await window.deleteProvinceFromCloud(prov.id);
+                    }
+                    for (const prov of defaultDatabase) {
+                        await window.saveProvinceToCloud(prov);
+                    }
                 }
-                for (const prov of defaultDatabase) {
-                    await window.saveProvinceToCloud(prov);
-                }
+                window.database = defaultDatabase;
+                window.saveToLocalStorage();
+                window.selectDefaultItem();
+                window.renderSidebar();
+                window.renderCodex();
             }
         };
 
-        // Start Cloud Sync on Page Load
+        // Initialize application on load
         window.addEventListener('DOMContentLoaded', () => {
-            initCloudSync();
+            initApp();
         });
     </script>
 </body>
