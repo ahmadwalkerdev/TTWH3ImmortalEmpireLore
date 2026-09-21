@@ -82,6 +82,12 @@
 
             <!-- Global Action Controls -->
             <div class="flex items-center flex-wrap gap-2 text-sm">
+                <!-- Cloud Sync Status Badge -->
+                <div id="cloudStatusBadge" class="px-3 py-1.5 rounded bg-wh-cardLight border border-blue-500/40 text-blue-300 flex items-center gap-2 text-xs">
+                    <i class="fa-solid fa-cloud-arrow-up animate-pulse"></i>
+                    <span id="cloudStatusText">Menghubungkan Ke Cloud...</span>
+                </div>
+
                 <!-- Mode Toggle -->
                 <button id="toggleEditModeBtn" onclick="toggleEditMode()" class="px-3 py-1.5 rounded bg-wh-cardLight border border-wh-gold/40 text-wh-gold hover:bg-wh-gold hover:text-black transition flex items-center gap-2">
                     <i class="fa-solid fa-pen-to-square"></i>
@@ -148,10 +154,24 @@
 
         <!-- Main Display Content Area -->
         <main class="flex-1 bg-wh-cardBg rounded-lg parchment-border p-6 shadow-2xl flex flex-col min-h-[500px]">
-            <div id="codexContent">
-                <!-- Dynamic Content Rendered Here -->
+        <div id="codexContent">
+            <!-- Dynamic Content Rendered Here -->
+        </div>
+    </main>
+</div>
+
+    <!-- Custom Notification & Confirmation Modal (Replaces browser alert/confirm) -->
+    <div id="customDialogModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-wh-cardBg border-2 border-wh-gold/80 rounded-lg max-w-md w-full p-6 shadow-2xl relative text-center">
+            <i id="dialogIcon" class="fa-solid fa-circle-info text-4xl text-wh-gold mb-3 block"></i>
+            <h3 id="dialogTitle" class="font-serif text-xl font-bold text-wh-gold mb-2">Konfirmasi</h3>
+            <p id="dialogMessage" class="text-sm text-gray-300 mb-6 leading-relaxed">Apakah Anda yakin?</p>
+            
+            <div class="flex justify-center gap-3">
+                <button id="dialogCancelBtn" onclick="closeCustomDialog(false)" class="px-4 py-2 text-sm bg-wh-dark border border-wh-border text-gray-400 hover:text-white rounded">Batal</button>
+                <button id="dialogConfirmBtn" onclick="closeCustomDialog(true)" class="px-4 py-2 text-sm bg-wh-gold text-black font-semibold rounded hover:bg-wh-goldHover">Ya, Lanjutkan</button>
             </div>
-        </main>
+        </div>
     </div>
 
     <!-- Province Modal -->
@@ -250,8 +270,37 @@
         </div>
     </div>
 
-    <script>
-        // Preset sample data Warhammer 3 Immortal Empires
+    <!-- Firebase Cloud Sync Integration -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Kredensial Firebase Mandiri untuk Hosting Publik (Ganti dengan config Firebase Anda jika di-host mandiri)
+const firebaseConfig = {
+  apiKey: "AIzaSyAovOp9wBnJsYwDmsEw2SZ0wnmhPX0S0BI",
+  authDomain: "warhammer3-lore-codex.firebaseapp.com",
+  projectId: "warhammer3-lore-codex",
+  storageBucket: "warhammer3-lore-codex.firebasestorage.app",
+  messagingSenderId: "1078440177047",
+  appId: "1:1078440177047:web:9265b00b7e0ef06bd2a8d2",
+  measurementId: "G-83MQN9YVFN"
+};
+
+        // Deteksi Otomatis Environment Platform vs Standalone Hosting
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'warhammer3-codex-app';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' 
+            ? JSON.parse(__firebase_config) 
+            : myStandaloneFirebaseConfig;
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Path Rule 1: /artifacts/{appId}/public/data/provinces
+        const provincesCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'provinces');
+
+        // Preset sample data
         const defaultDatabase = [
             {
                 id: 'prov-reikland',
@@ -337,51 +386,145 @@
             }
         ];
 
-        // App State
-        let database = [];
-        let isEditMode = false;
-        let selectedSettlementId = null;
-        let selectedProvinceId = null;
-        let currentSearchQuery = '';
-        let currentRegionFilter = 'ALL';
+        // State Variables
+        window.database = [];
+        window.isEditMode = false;
+        window.selectedSettlementId = null;
+        window.selectedProvinceId = null;
+        window.currentSearchQuery = '';
+        window.currentRegionFilter = 'ALL';
+        
+        let dialogResolver = null;
 
-        // LocalStorage Key
-        const STORAGE_KEY = 'wh3_settlement_lore_db_v1';
+        // Custom Modal Alert / Confirm System
+        window.showCustomDialog = function(title, message, isConfirm = false, iconClass = "fa-circle-info text-wh-gold") {
+            return new Promise((resolve) => {
+                dialogResolver = resolve;
+                document.getElementById('dialogTitle').textContent = title;
+                document.getElementById('dialogMessage').textContent = message;
+                
+                const iconElem = document.getElementById('dialogIcon');
+                iconElem.className = `fa-solid ${iconClass} text-4xl mb-3 block`;
 
-        // Initialize App
-        window.addEventListener('DOMContentLoaded', () => {
-            loadDatabase();
-            renderSidebar();
-            selectDefaultItem();
-        });
-
-        // Load DB from LocalStorage or Fallback
-        function loadDatabase() {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            if (stored) {
-                try {
-                    database = JSON.parse(stored);
-                } catch (e) {
-                    console.error('Failed to parse local database:', e);
-                    database = JSON.parse(JSON.stringify(defaultDatabase));
+                const cancelBtn = document.getElementById('dialogCancelBtn');
+                if (isConfirm) {
+                    cancelBtn.classList.remove('hidden');
+                } else {
+                    cancelBtn.classList.add('hidden');
                 }
-            } else {
-                database = JSON.parse(JSON.stringify(defaultDatabase));
+
+                document.getElementById('customDialogModal').classList.remove('hidden');
+            });
+        };
+
+        window.closeCustomDialog = function(result) {
+            document.getElementById('customDialogModal').classList.add('hidden');
+            if (dialogResolver) {
+                dialogResolver(result);
+                dialogResolver = null;
             }
-            saveDatabaseToStorage();
+        };
+
+        // Update Cloud Status UI Indicator
+        function updateCloudStatus(status, text) {
+            const badge = document.getElementById('cloudStatusBadge');
+            const textElem = document.getElementById('cloudStatusText');
+            if (!badge || !textElem) return;
+
+            textElem.textContent = text;
+            if (status === 'connected') {
+                badge.className = "px-3 py-1.5 rounded bg-green-950/60 border border-green-500/50 text-green-300 flex items-center gap-2 text-xs";
+                badge.querySelector('i').className = "fa-solid fa-cloud-check";
+            } else if (status === 'syncing') {
+                badge.className = "px-3 py-1.5 rounded bg-wh-cardLight border border-wh-gold/50 text-wh-gold flex items-center gap-2 text-xs";
+                badge.querySelector('i').className = "fa-solid fa-cloud-arrow-up animate-pulse";
+            } else {
+                badge.className = "px-3 py-1.5 rounded bg-red-950/60 border border-red-500/50 text-red-300 flex items-center gap-2 text-xs";
+                badge.querySelector('i').className = "fa-solid fa-cloud-xmark";
+            }
         }
 
-        function saveDatabaseToStorage() {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(database));
+        // Initialize Firebase Authentication & Real-time Listeners
+        async function initCloudSync() {
+            try {
+                updateCloudStatus('syncing', 'Otentikasi Cloud...');
+                
+                // Rule 3: Auth BEFORE Queries
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                updateCloudStatus('syncing', 'Menyinkronkan Data...');
+
+                // Real-time listener using onSnapshot
+                onSnapshot(provincesCollectionRef, async (snapshot) => {
+                    const loadedProvinces = [];
+                    snapshot.forEach(docSnap => {
+                        loadedProvinces.push({ id: docSnap.id, ...docSnap.data() });
+                    });
+
+                    // If cloud DB is brand new/empty, seed with default database
+                    if (loadedProvinces.length === 0 && snapshot.metadata.fromCache === false) {
+                        updateCloudStatus('syncing', 'Inisialisasi Template Data...');
+                        for (const prov of defaultDatabase) {
+                            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'provinces', prov.id), prov);
+                        }
+                        return;
+                    }
+
+                    window.database = loadedProvinces;
+                    updateCloudStatus('connected', 'Cloud Terhubung');
+
+                    if (!window.selectedProvinceId && !window.selectedSettlementId) {
+                        window.selectDefaultItem();
+                    }
+
+                    window.renderSidebar();
+                    window.renderCodex();
+                }, (error) => {
+                    console.error("Firestore error:", error);
+                    updateCloudStatus('error', 'Gagal Sinkron Cloud');
+                });
+
+            } catch (err) {
+                console.error("Cloud Initialization Error:", err);
+                updateCloudStatus('error', 'Koneksi Cloud Terputus');
+            }
         }
 
-        // Toggle Edit Mode
-        function toggleEditMode() {
-            isEditMode = !isEditMode;
+        // Helper to sync single province to Firestore
+        window.saveProvinceToCloud = async function(provinceData) {
+            updateCloudStatus('syncing', 'Menyimpan...');
+            try {
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'provinces', provinceData.id), provinceData);
+                updateCloudStatus('connected', 'Cloud Terhubung');
+            } catch (e) {
+                console.error("Failed to save province:", e);
+                updateCloudStatus('error', 'Gagal Menyimpan');
+            }
+        };
+
+        // Helper to delete province from Firestore
+        window.deleteProvinceFromCloud = async function(provId) {
+            updateCloudStatus('syncing', 'Menghapus...');
+            try {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'provinces', provId));
+                updateCloudStatus('connected', 'Cloud Terhubung');
+            } catch (e) {
+                console.error("Failed to delete province:", e);
+                updateCloudStatus('error', 'Gagal Menghapus');
+            }
+        };
+
+        // Application Methods
+        window.toggleEditMode = function() {
+            window.isEditMode = !window.isEditMode;
             const statusText = document.getElementById('editModeStatusText');
             const addProvBtn = document.getElementById('addProvinceBtn');
 
-            if (isEditMode) {
+            if (window.isEditMode) {
                 statusText.textContent = 'Edit Mode: ON';
                 statusText.classList.add('text-green-400');
                 addProvBtn.classList.remove('hidden');
@@ -393,67 +536,64 @@
                 addProvBtn.classList.remove('flex');
             }
 
-            renderSidebar();
-            renderCodex();
-        }
+            window.renderSidebar();
+            window.renderCodex();
+        };
 
-        // Select Default view on load
-        function selectDefaultItem() {
-            if (database.length > 0 && database[0].settlements.length > 0) {
-                selectSettlement(database[0].settlements[0].id, database[0].id);
-            } else if (database.length > 0) {
-                selectProvince(database[0].id);
+        window.selectDefaultItem = function() {
+            if (window.database.length > 0 && window.database[0].settlements.length > 0) {
+                window.selectSettlement(window.database[0].settlements[0].id, window.database[0].id);
+            } else if (window.database.length > 0) {
+                window.selectProvince(window.database[0].id);
             } else {
-                renderCodex();
+                window.renderCodex();
             }
-        }
+        };
 
-        // Populate Region Filter Select
-        function populateRegionFilter() {
+        window.populateRegionFilter = function() {
             const filterSelect = document.getElementById('regionFilter');
+            if (!filterSelect) return;
             const regions = new Set();
-            database.forEach(p => {
+            window.database.forEach(p => {
                 if (p.region) regions.add(p.region);
             });
 
             let html = `<option value="ALL">Semua Kawasan / Faksi Domain</option>`;
             regions.forEach(reg => {
-                const selected = currentRegionFilter === reg ? 'selected' : '';
-                html += `<option value="${escapeHTML(reg)}" ${selected}>${escapeHTML(reg)}</option>`;
+                const selected = window.currentRegionFilter === reg ? 'selected' : '';
+                html += `<option value="${window.escapeHTML(reg)}" ${selected}>${window.escapeHTML(reg)}</option>`;
             });
             filterSelect.innerHTML = html;
-        }
+        };
 
-        // Render Sidebar Navigation
-        function renderSidebar() {
-            populateRegionFilter();
+        window.renderSidebar = function() {
+            window.populateRegionFilter();
             const sidebarContainer = document.getElementById('sidebarTree');
+            if (!sidebarContainer) return;
             let totalSettlements = 0;
             let html = '';
 
-            const query = currentSearchQuery.toLowerCase().trim();
+            const query = window.currentSearchQuery.toLowerCase().trim();
 
-            database.forEach(prov => {
-                // Filter by region dropdown
-                if (currentRegionFilter !== 'ALL' && prov.region !== currentRegionFilter) {
+            window.database.forEach(prov => {
+                if (window.currentRegionFilter !== 'ALL' && prov.region !== window.currentRegionFilter) {
                     return;
                 }
 
-                // Filter settlements by search
-                const matchingSettlements = prov.settlements.filter(s => 
+                const matchingSettlements = (prov.settlements || []).filter(s => 
                     s.name.toLowerCase().includes(query) || 
                     s.lore.toLowerCase().includes(query) ||
-                    s.originalFaction.toLowerCase().includes(query)
+                    (s.originalFaction && s.originalFaction.toLowerCase().includes(query))
                 );
 
-                const provinceMatches = prov.name.toLowerCase().includes(query) || prov.region.toLowerCase().includes(query);
+                const provinceMatches = prov.name.toLowerCase().includes(query) || (prov.region && prov.region.toLowerCase().includes(query));
 
                 if (query && !provinceMatches && matchingSettlements.length === 0) {
-                    return; // Skip if search doesn't match
+                    return;
                 }
 
-                totalSettlements += prov.settlements.length;
-                const isProvSelected = selectedProvinceId === prov.id && !selectedSettlementId;
+                totalSettlements += (prov.settlements || []).length;
+                const isProvSelected = window.selectedProvinceId === prov.id && !window.selectedSettlementId;
 
                 html += `
                 <div class="bg-wh-dark/70 border border-wh-border/70 rounded overflow-hidden">
@@ -461,12 +601,12 @@
                         <div class="flex items-center gap-2 overflow-hidden" onclick="selectProvince('${prov.id}')">
                             <i class="fa-solid fa-map-location-dot text-wh-gold text-xs"></i>
                             <div>
-                                <h4 class="font-serif font-bold text-xs text-amber-100 truncate">${escapeHTML(prov.name)}</h4>
-                                <span class="text-[10px] text-gray-400 block">${escapeHTML(prov.region)}</span>
+                                <h4 class="font-serif font-bold text-xs text-amber-100 truncate">${window.escapeHTML(prov.name)}</h4>
+                                <span class="text-[10px] text-gray-400 block">${window.escapeHTML(prov.region)}</span>
                             </div>
                         </div>
                         <div class="flex items-center gap-1">
-                            ${isEditMode ? `
+                            ${window.isEditMode ? `
                                 <button onclick="openProvinceModal('${prov.id}')" title="Edit Provinsi" class="text-xs text-gray-400 hover:text-wh-gold p-1">
                                     <i class="fa-solid fa-pen"></i>
                                 </button>
@@ -480,25 +620,24 @@
                         </div>
                     </div>
 
-                    <!-- Settlements Under Province -->
                     <div class="pl-4 pr-1 py-1 space-y-1 bg-black/30 border-t border-wh-border/30">
                 `;
 
                 const settlementsToDisplay = query ? (provinceMatches ? prov.settlements : matchingSettlements) : prov.settlements;
 
-                if (settlementsToDisplay.length === 0) {
+                if (!settlementsToDisplay || settlementsToDisplay.length === 0) {
                     html += `<p class="text-[11px] text-gray-500 italic py-1 pl-2">Tidak ada settlement.</p>`;
                 } else {
                     settlementsToDisplay.forEach(settle => {
-                        const isSettleSelected = selectedSettlementId === settle.id;
+                        const isSettleSelected = window.selectedSettlementId === settle.id;
                         html += `
                         <div class="flex items-center justify-between py-1 px-2 rounded hover:bg-wh-dark/80 cursor-pointer text-xs ${isSettleSelected ? 'bg-wh-gold/20 text-wh-gold font-semibold border-l-2 border-wh-gold' : 'text-gray-300'}"
                              onclick="selectSettlement('${settle.id}', '${prov.id}')">
                             <div class="flex items-center gap-2 truncate">
-                                <i class="fa-solid ${getSettlementIcon(settle.type)} text-[10px] text-wh-gold/70"></i>
-                                <span class="truncate">${escapeHTML(settle.name)}</span>
+                                <i class="fa-solid ${window.getSettlementIcon(settle.type)} text-[10px] text-wh-gold/70"></i>
+                                <span class="truncate">${window.escapeHTML(settle.name)}</span>
                             </div>
-                            ${isEditMode ? `
+                            ${window.isEditMode ? `
                                 <div class="flex items-center gap-1">
                                     <button onclick="event.stopPropagation(); openSettlementModal('${settle.id}', '${prov.id}')" class="text-[10px] text-gray-400 hover:text-wh-gold p-0.5">
                                         <i class="fa-solid fa-pen"></i>
@@ -525,36 +664,33 @@
 
             sidebarContainer.innerHTML = html;
             document.getElementById('settlementCountBadge').textContent = `${totalSettlements} Settlement`;
-        }
+        };
 
-        // Selection Handlers
-        function selectProvince(provId) {
-            selectedProvinceId = provId;
-            selectedSettlementId = null;
-            renderSidebar();
-            renderCodex();
-        }
+        window.selectProvince = function(provId) {
+            window.selectedProvinceId = provId;
+            window.selectedSettlementId = null;
+            window.renderSidebar();
+            window.renderCodex();
+        };
 
-        function selectSettlement(settleId, provId) {
-            selectedSettlementId = settleId;
-            selectedProvinceId = provId;
-            renderSidebar();
-            renderCodex();
-        }
+        window.selectSettlement = function(settleId, provId) {
+            window.selectedSettlementId = settleId;
+            window.selectedProvinceId = provId;
+            window.renderSidebar();
+            window.renderCodex();
+        };
 
-        // Filter & Search Handlers
-        function handleSearch() {
-            currentSearchQuery = document.getElementById('searchInput').value;
-            renderSidebar();
-        }
+        window.handleSearch = function() {
+            window.currentSearchQuery = document.getElementById('searchInput').value;
+            window.renderSidebar();
+        };
 
-        function handleFilterRegion() {
-            currentRegionFilter = document.getElementById('regionFilter').value;
-            renderSidebar();
-        }
+        window.handleFilterRegion = function() {
+            window.currentRegionFilter = document.getElementById('regionFilter').value;
+            window.renderSidebar();
+        };
 
-        // Icon Helper for Settlement Types
-        function getSettlementIcon(type) {
+        window.getSettlementIcon = function(type) {
             switch(type) {
                 case 'Provincial Capital': return 'fa-crown';
                 case 'Major Settlement': return 'fa-castle';
@@ -563,13 +699,13 @@
                 case 'Fortress / Gate': return 'fa-shield-cat';
                 default: return 'fa-location-dot';
             }
-        }
+        };
 
-        // Render Main Codex / Detail View
-        function renderCodex() {
+        window.renderCodex = function() {
             const container = document.getElementById('codexContent');
+            if (!container) return;
 
-            if (!selectedProvinceId && !selectedSettlementId) {
+            if (!window.selectedProvinceId && !window.selectedSettlementId) {
                 container.innerHTML = `
                 <div class="h-full flex flex-col items-center justify-center text-center p-8 text-gray-400 my-auto">
                     <i class="fa-solid fa-book-skull text-6xl text-wh-gold/40 mb-4"></i>
@@ -580,13 +716,12 @@
                 return;
             }
 
-            const currentProv = database.find(p => p.id === selectedProvinceId);
+            const currentProv = window.database.find(p => p.id === window.selectedProvinceId);
 
-            if (selectedSettlementId) {
-                // Render Settlement View
+            if (window.selectedSettlementId) {
                 let currentSettle = null;
-                if (currentProv) {
-                    currentSettle = currentProv.settlements.find(s => s.id === selectedSettlementId);
+                if (currentProv && currentProv.settlements) {
+                    currentSettle = currentProv.settlements.find(s => s.id === window.selectedSettlementId);
                 }
 
                 if (!currentSettle) {
@@ -596,25 +731,24 @@
 
                 container.innerHTML = `
                 <article class="space-y-6">
-                    <!-- Header Badges & Title -->
                     <div class="border-b border-wh-border pb-4">
                         <div class="flex flex-wrap items-center gap-2 mb-2">
                             <span class="px-2.5 py-0.5 rounded text-xs font-semibold bg-wh-gold/10 border border-wh-gold/40 text-wh-gold">
-                                <i class="fa-solid ${getSettlementIcon(currentSettle.type)} mr-1"></i> ${escapeHTML(currentSettle.type)}
+                                <i class="fa-solid ${window.getSettlementIcon(currentSettle.type)} mr-1"></i> ${window.escapeHTML(currentSettle.type)}
                             </span>
                             <span class="px-2.5 py-0.5 rounded text-xs bg-wh-dark border border-wh-border text-amber-200">
-                                <i class="fa-solid fa-cloud-sun mr-1"></i> ${escapeHTML(currentSettle.climate)}
+                                <i class="fa-solid fa-cloud-sun mr-1"></i> ${window.escapeHTML(currentSettle.climate)}
                             </span>
                             <span class="px-2.5 py-0.5 rounded text-xs bg-wh-dark border border-wh-border text-gray-300">
-                                <i class="fa-solid fa-map-pin mr-1"></i> Provinsi: ${escapeHTML(currentProv ? currentProv.name : 'N/A')}
+                                <i class="fa-solid fa-map-pin mr-1"></i> Provinsi: ${window.escapeHTML(currentProv ? currentProv.name : 'N/A')}
                             </span>
                         </div>
 
                         <div class="flex items-center justify-between">
                             <h2 class="font-serif text-3xl md:text-4xl font-extrabold text-wh-gold codex-header">
-                                ${escapeHTML(currentSettle.name)}
+                                ${window.escapeHTML(currentSettle.name)}
                             </h2>
-                            ${isEditMode ? `
+                            ${window.isEditMode ? `
                                 <div class="flex gap-2">
                                     <button onclick="openSettlementModal('${currentSettle.id}', '${currentProv.id}')" class="px-3 py-1 bg-amber-900/40 border border-amber-600 text-amber-200 text-xs rounded hover:bg-amber-700 hover:text-white transition">
                                         <i class="fa-solid fa-pen mr-1"></i> Edit
@@ -624,42 +758,39 @@
                         </div>
                     </div>
 
-                    <!-- Meta Information Box -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-wh-dark/60 p-4 rounded border border-wh-border/80 text-sm">
                         <div>
                             <span class="text-xs text-gray-400 uppercase tracking-wider block font-serif">Faksi Pemilik Default:</span>
-                            <span class="font-medium text-amber-100">${escapeHTML(currentSettle.originalFaction || 'Tidak diketahui')}</span>
+                            <span class="font-medium text-amber-100">${window.escapeHTML(currentSettle.originalFaction || 'Tidak diketahui')}</span>
                         </div>
                         <div>
                             <span class="text-xs text-gray-400 uppercase tracking-wider block font-serif">Landmark / Fitur Khusus:</span>
-                            <span class="font-medium text-amber-100">${escapeHTML(currentSettle.landmarks || 'None')}</span>
+                            <span class="font-medium text-amber-100">${window.escapeHTML(currentSettle.landmarks || 'None')}</span>
                         </div>
                     </div>
 
-                    <!-- Lore Description Content -->
                     <div class="space-y-4">
                         <h3 class="font-serif text-lg font-bold text-wh-gold border-b border-wh-border/50 pb-1 flex items-center gap-2">
                             <i class="fa-solid fa-scroll text-sm"></i> Catatan Sejarah & Lore
                         </h3>
                         <div class="text-wh-parchmentText text-sm leading-relaxed whitespace-pre-line font-sans tracking-wide">
-                            ${escapeHTML(currentSettle.lore)}
+                            ${window.escapeHTML(currentSettle.lore)}
                         </div>
                     </div>
                 </article>
                 `;
             } else if (currentProv) {
-                // Render Province Overview View
                 container.innerHTML = `
                 <article class="space-y-6">
                     <div class="border-b border-wh-border pb-4">
                         <span class="px-2.5 py-0.5 rounded text-xs font-semibold bg-wh-gold/10 border border-wh-gold/40 text-wh-gold">
-                            <i class="fa-solid fa-earth-americas mr-1"></i> Kawasan: ${escapeHTML(currentProv.region)}
+                            <i class="fa-solid fa-earth-americas mr-1"></i> Kawasan: ${window.escapeHTML(currentProv.region)}
                         </span>
                         <div class="flex items-center justify-between mt-2">
                             <h2 class="font-serif text-3xl font-extrabold text-wh-gold codex-header">
-                                Provinsi ${escapeHTML(currentProv.name)}
+                                Provinsi ${window.escapeHTML(currentProv.name)}
                             </h2>
-                            ${isEditMode ? `
+                            ${window.isEditMode ? `
                                 <button onclick="openProvinceModal('${currentProv.id}')" class="px-3 py-1 bg-amber-900/40 border border-amber-600 text-amber-200 text-xs rounded hover:bg-amber-700 transition">
                                     <i class="fa-solid fa-pen mr-1"></i> Edit Provinsi
                                 </button>
@@ -668,20 +799,20 @@
                     </div>
 
                     <p class="text-sm text-gray-300">
-                        Provinsi <strong>${escapeHTML(currentProv.name)}</strong> berada di bawah domain <strong>${escapeHTML(currentProv.region)}</strong>. Berikut adalah daftar settlement penting yang terletak di dalam batas wilayah ini:
+                        Provinsi <strong>${window.escapeHTML(currentProv.name)}</strong> berada di bawah domain <strong>${window.escapeHTML(currentProv.region)}</strong>. Berikut adalah daftar settlement penting yang terletak di dalam batas wilayah ini:
                     </p>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                        ${currentProv.settlements.map(s => `
+                        ${(currentProv.settlements || []).map(s => `
                             <div onclick="selectSettlement('${s.id}', '${currentProv.id}')" class="bg-wh-dark/80 border border-wh-border rounded p-4 hover:border-wh-gold transition cursor-pointer group">
                                 <div class="flex items-center justify-between mb-2">
                                     <h4 class="font-serif text-base font-bold text-amber-200 group-hover:text-wh-gold flex items-center gap-2">
-                                        <i class="fa-solid ${getSettlementIcon(s.type)} text-sm text-wh-gold"></i>
-                                        ${escapeHTML(s.name)}
+                                        <i class="fa-solid ${window.getSettlementIcon(s.type)} text-sm text-wh-gold"></i>
+                                        ${window.escapeHTML(s.name)}
                                     </h4>
-                                    <span class="text-[10px] bg-wh-cardBg border border-wh-border px-2 py-0.5 rounded text-gray-400">${escapeHTML(s.type)}</span>
+                                    <span class="text-[10px] bg-wh-cardBg border border-wh-border px-2 py-0.5 rounded text-gray-400">${window.escapeHTML(s.type)}</span>
                                 </div>
-                                <p class="text-xs text-gray-400 line-clamp-3 mb-2">${escapeHTML(s.lore)}</p>
+                                <p class="text-xs text-gray-400 line-clamp-3 mb-2">${window.escapeHTML(s.lore)}</p>
                                 <span class="text-[11px] text-wh-gold group-hover:underline inline-flex items-center gap-1">
                                     Baca Lore Selengkapnya <i class="fa-solid fa-arrow-right text-[9px]"></i>
                                 </span>
@@ -689,7 +820,7 @@
                         `).join('')}
                     </div>
 
-                    ${isEditMode ? `
+                    ${window.isEditMode ? `
                         <div class="pt-4 border-t border-wh-border">
                             <button onclick="openSettlementModal(null, '${currentProv.id}')" class="px-4 py-2 bg-wh-gold/20 border border-wh-gold text-wh-gold rounded text-sm hover:bg-wh-gold hover:text-black font-semibold transition flex items-center gap-2">
                                 <i class="fa-solid fa-plus-circle"></i> Tambah Settlement Baru ke Provinsi Ini
@@ -699,18 +830,16 @@
                 </article>
                 `;
             }
-        }
+        };
 
-        // Helper function to escape HTML string
-        function escapeHTML(str) {
+        window.escapeHTML = function(str) {
             if (!str) return '';
             return str.replace(/[&<>'"]/g, 
                 tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
             );
-        }
+        };
 
-        // Province CRUD
-        function openProvinceModal(provId = null) {
+        window.openProvinceModal = function(provId = null) {
             const modal = document.getElementById('provinceModal');
             const title = document.getElementById('provinceModalTitle');
             const idInput = document.getElementById('provinceIdInput');
@@ -718,7 +847,7 @@
             const regionInput = document.getElementById('provinceRegionInput');
 
             if (provId) {
-                const prov = database.find(p => p.id === provId);
+                const prov = window.database.find(p => p.id === provId);
                 if (prov) {
                     title.textContent = 'Edit Provinsi';
                     idInput.value = prov.id;
@@ -733,57 +862,61 @@
             }
 
             modal.classList.remove('hidden');
-        }
+        };
 
-        function closeProvinceModal() {
+        window.closeProvinceModal = function() {
             document.getElementById('provinceModal').classList.add('hidden');
-        }
+        };
 
-        function saveProvince(e) {
+        window.saveProvince = async function(e) {
             e.preventDefault();
             const id = document.getElementById('provinceIdInput').value;
             const name = document.getElementById('provinceNameInput').value.trim();
             const region = document.getElementById('provinceRegionInput').value.trim();
 
+            let targetProv;
             if (id) {
-                const prov = database.find(p => p.id === id);
-                if (prov) {
-                    prov.name = name;
-                    prov.region = region;
+                targetProv = window.database.find(p => p.id === id);
+                if (targetProv) {
+                    targetProv.name = name;
+                    targetProv.region = region;
                 }
             } else {
-                const newProv = {
+                targetProv = {
                     id: 'prov-' + Date.now(),
                     name: name,
                     region: region,
                     settlements: []
                 };
-                database.push(newProv);
-                selectedProvinceId = newProv.id;
-                selectedSettlementId = null;
+                window.selectedProvinceId = targetProv.id;
+                window.selectedSettlementId = null;
             }
 
-            saveDatabaseToStorage();
-            closeProvinceModal();
-            renderSidebar();
-            renderCodex();
-        }
+            if (targetProv) {
+                await window.saveProvinceToCloud(targetProv);
+            }
 
-        function deleteProvince(provId) {
-            if (confirm('Apakah Anda yakin ingin menghapus provinsi ini beserta seluruh settlement di dalamnya?')) {
-                database = database.filter(p => p.id !== provId);
-                if (selectedProvinceId === provId) {
-                    selectedProvinceId = null;
-                    selectedSettlementId = null;
+            window.closeProvinceModal();
+        };
+
+        window.deleteProvince = async function(provId) {
+            const confirmed = await window.showCustomDialog(
+                'Hapus Provinsi',
+                'Apakah Anda yakin ingin menghapus provinsi ini beserta seluruh settlement di dalamnya dari Cloud?',
+                true,
+                'fa-triangle-exclamation text-red-500'
+            );
+
+            if (confirmed) {
+                await window.deleteProvinceFromCloud(provId);
+                if (window.selectedProvinceId === provId) {
+                    window.selectedProvinceId = null;
+                    window.selectedSettlementId = null;
                 }
-                saveDatabaseToStorage();
-                renderSidebar();
-                renderCodex();
             }
-        }
+        };
 
-        // Settlement CRUD
-        function openSettlementModal(settleId = null, provId = null) {
+        window.openSettlementModal = function(settleId = null, provId = null) {
             const modal = document.getElementById('settlementModal');
             const title = document.getElementById('settlementModalTitle');
             const idInput = document.getElementById('settlementIdInput');
@@ -796,12 +929,12 @@
             const landmarkInput = document.getElementById('settlementLandmarkInput');
             const loreInput = document.getElementById('settlementLoreInput');
 
-            provIdInput.value = provId || selectedProvinceId;
+            provIdInput.value = provId || window.selectedProvinceId;
 
             if (settleId) {
                 title.textContent = 'Edit Settlement';
-                const prov = database.find(p => p.id === provIdInput.value);
-                const settle = prov ? prov.settlements.find(s => s.id === settleId) : null;
+                const prov = window.database.find(p => p.id === provIdInput.value);
+                const settle = prov && prov.settlements ? prov.settlements.find(s => s.id === settleId) : null;
 
                 if (settle) {
                     idInput.value = settle.id;
@@ -824,13 +957,13 @@
             }
 
             modal.classList.remove('hidden');
-        }
+        };
 
-        function closeSettlementModal() {
+        window.closeSettlementModal = function() {
             document.getElementById('settlementModal').classList.add('hidden');
-        }
+        };
 
-        function saveSettlement(e) {
+        window.saveSettlement = async function(e) {
             e.preventDefault();
             const settleId = document.getElementById('settlementIdInput').value;
             const provId = document.getElementById('settlementProvinceIdInput').value;
@@ -842,8 +975,10 @@
             const landmarks = document.getElementById('settlementLandmarkInput').value.trim();
             const lore = document.getElementById('settlementLoreInput').value.trim();
 
-            const prov = database.find(p => p.id === provId);
+            const prov = window.database.find(p => p.id === provId);
             if (!prov) return;
+
+            if (!prov.settlements) prov.settlements = [];
 
             if (settleId) {
                 const settle = prov.settlements.find(s => s.id === settleId);
@@ -866,77 +1001,90 @@
                     lore: lore
                 };
                 prov.settlements.push(newSettle);
-                selectedSettlementId = newSettle.id;
+                window.selectedSettlementId = newSettle.id;
             }
 
-            selectedProvinceId = provId;
-            saveDatabaseToStorage();
-            closeSettlementModal();
-            renderSidebar();
-            renderCodex();
-        }
+            window.selectedProvinceId = provId;
+            await window.saveProvinceToCloud(prov);
+            window.closeSettlementModal();
+        };
 
-        function deleteSettlement(settleId, provId) {
-            if (confirm('Apakah Anda yakin ingin menghapus settlement ini?')) {
-                const prov = database.find(p => p.id === provId);
-                if (prov) {
+        window.deleteSettlement = async function(settleId, provId) {
+            const confirmed = await window.showCustomDialog(
+                'Hapus Settlement',
+                'Apakah Anda yakin ingin menghapus settlement ini dari Cloud?',
+                true,
+                'fa-trash text-red-400'
+            );
+
+            if (confirmed) {
+                const prov = window.database.find(p => p.id === provId);
+                if (prov && prov.settlements) {
                     prov.settlements = prov.settlements.filter(s => s.id !== settleId);
-                    if (selectedSettlementId === settleId) {
-                        selectedSettlementId = null;
+                    if (window.selectedSettlementId === settleId) {
+                        window.selectedSettlementId = null;
                     }
-                    saveDatabaseToStorage();
-                    renderSidebar();
-                    renderCodex();
+                    await window.saveProvinceToCloud(prov);
                 }
             }
-        }
+        };
 
-        // Export JSON Data
-        function exportDataJSON() {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(database, null, 2));
+        window.exportDataJSON = function() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(window.database, null, 2));
             const downloadAnchor = document.createElement('a');
             downloadAnchor.setAttribute("href", dataStr);
             downloadAnchor.setAttribute("download", `warhammer3_settlements_lore_${new Date().toISOString().slice(0,10)}.json`);
             document.body.appendChild(downloadAnchor);
             downloadAnchor.click();
             downloadAnchor.remove();
-        }
+        };
 
-        // Import JSON Data
-        function importDataJSON(event) {
+        window.importDataJSON = function(event) {
             const fileReader = new FileReader();
-            fileReader.onload = function(e) {
+            fileReader.onload = async function(e) {
                 try {
                     const importedData = JSON.parse(e.target.result);
                     if (Array.isArray(importedData)) {
-                        database = importedData;
-                        saveDatabaseToStorage();
-                        selectDefaultItem();
-                        renderSidebar();
-                        renderCodex();
-                        alert('Database lore berhasil diimpor!');
+                        for (const prov of importedData) {
+                            if (prov.id) {
+                                await window.saveProvinceToCloud(prov);
+                            }
+                        }
+                        await window.showCustomDialog('Sukses', 'Database lore berhasil diimpor dan disinkronkan ke Cloud!', false, 'fa-circle-check text-green-400');
                     } else {
-                        alert('Format JSON tidak valid. Harus berupa array data provinsi.');
+                        await window.showCustomDialog('Gagal Impor', 'Format JSON tidak valid. Harus berupa array data provinsi.', false, 'fa-circle-xmark text-red-400');
                     }
                 } catch (err) {
-                    alert('Gagal membaca file JSON: ' + err.message);
+                    await window.showCustomDialog('Gagal Impor', 'Gagal membaca file JSON: ' + err.message, false, 'fa-circle-xmark text-red-400');
                 }
             };
             if (event.target.files[0]) {
                 fileReader.readAsText(event.target.files[0]);
             }
-        }
+        };
 
-        // Reset to Default Sample Template
-        function confirmResetData() {
-            if (confirm('Apakah Anda yakin ingin mengembalikan seluruh data ke preset data contoh awal? Semua perubahan tersimpan lokal akan ditimpa.')) {
-                database = JSON.parse(JSON.stringify(defaultDatabase));
-                saveDatabaseToStorage();
-                selectDefaultItem();
-                renderSidebar();
-                renderCodex();
+        window.confirmResetData = async function() {
+            const confirmed = await window.showCustomDialog(
+                'Reset Database Cloud',
+                'Apakah Anda yakin ingin mengembalikan seluruh data cloud ke preset data contoh awal?',
+                true,
+                'fa-rotate-left text-amber-500'
+            );
+
+            if (confirmed) {
+                for (const prov of window.database) {
+                    await window.deleteProvinceFromCloud(prov.id);
+                }
+                for (const prov of defaultDatabase) {
+                    await window.saveProvinceToCloud(prov);
+                }
             }
-        }
+        };
+
+        // Start Cloud Sync on Page Load
+        window.addEventListener('DOMContentLoaded', () => {
+            initCloudSync();
+        });
     </script>
 </body>
 </html>
