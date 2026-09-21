@@ -272,18 +272,20 @@
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Kredensial Firebase Mandiri
-const firebaseConfig = {
-  apiKey: "AIzaSyAovOp9wBnJsYwDmsEw2SZ0wnmhPX0S0BI",
-  authDomain: "warhammer3-lore-codex.firebaseapp.com",
-  projectId: "warhammer3-lore-codex",
-  storageBucket: "warhammer3-lore-codex.firebasestorage.app",
-  messagingSenderId: "1078440177047",
-  appId: "1:1078440177047:web:9265b00b7e0ef06bd2a8d2",
-  measurementId: "G-83MQN9YVFN"
-};
+        // PERBAIKAN DI SINI: Mengubah nama variabel pertama agar tidak bentrok
+        const myStandaloneFirebaseConfig = {
+          apiKey: "AIzaSyAovOp9wBnJsYwDmsEw2SZ0wnmhPX0S0BI",
+          authDomain: "warhammer3-lore-codex.firebaseapp.com",
+          projectId: "warhammer3-lore-codex",
+          storageBucket: "warhammer3-lore-codex.firebasestorage.app",
+          messagingSenderId: "1078440177047",
+          appId: "1:1078440177047:web:9265b00b7e0ef06bd2a8d2",
+          measurementId: "G-83MQN9YVFN"
+        };
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'warhammer3-codex-app';
+        
+        // PERBAIKAN DI SINI: Menggunakan variabel yang sudah di-rename di atas
         const firebaseConfig = typeof __firebase_config !== 'undefined' 
             ? JSON.parse(__firebase_config) 
             : myStandaloneFirebaseConfig;
